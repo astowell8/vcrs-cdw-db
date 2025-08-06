@@ -5,6 +5,7 @@ DEVELOPER: Andy S
 HISTORY:
 
   v1.0.0 - Created Procedure.
+  v1.0.1 - New Insert Field RecordedDTTTM.
 
 ****/
 
@@ -23,11 +24,11 @@ BEGIN
 	SELECT @AccountId = Id FROM dbo.Account WHERE Name = @AccountName;
 
 	IF @TransactionType IN ( 'CREDIT','C') BEGIN
-		INSERT INTO dbo.TransactionHistory ( AccountId, Credit, TransactionDTTM )
-		SELECT @AccountId, @Amount, @DTTM
+		INSERT INTO dbo.TransactionHistory ( AccountId, Credit, TransactionDTTM, RecordedDTTM )
+		SELECT @AccountId, @Amount, @DTTM, GETDATE()
 	END ELSE IF @TransactionType IN ( 'DEBIT','D') BEGIN
-		INSERT INTO dbo.TransactionHistory ( AccountId, Debit, TransactionDTTM )
-		SELECT @AccountId, @Amount, @DTTM
+		INSERT INTO dbo.TransactionHistory ( AccountId, Debit, TransactionDTTM, RecordedDTTM )
+		SELECT @AccountId, @Amount, @DTTM, GETDATE()
 	END
 
 END
