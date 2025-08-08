@@ -11,13 +11,27 @@
 #   (LB) Label
 #
 
-#end
+#endregion
 
+#region  ~~  DATA STRUCTURES  ~~
+
+$DT = New-Object System.Data.DataTable
+
+$DT.Columns.Add('Release'  ,[Version]) | Out-Null
+$DT.Columns.Add('Tag'      ,[String])  | Out-Null
+$DT.Columns.Add('TagDate'  ,[String])  | Out-Null
+$DT.Columns.Add('TagSHA'   ,[String])  | Out-Null
+$DT.Columns.Add('CommitSHA',[String])  | Out-Null
+
+#endregion
+
+
+#region  ~~  WPF XAML  ~~
 Add-Type -AssemblyName PresentationFramework
 
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        Title="Git Version Tagger" Height="400" Width="600">
+        Title="CDW Release Version Tagger" Height="400" Width="600">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -38,10 +52,14 @@ Add-Type -AssemblyName PresentationFramework
         
         <Label x:Name="LB_StatusMessage" Grid.Row="2" Foreground="Blue" FontWeight="Bold" Margin="0,0,0,10"/>
 
-        <DataGrid x:Name="DG_TagHistory" Grid.Row="3" AutoGenerateColumns="False" CanUserAddRows="False">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Git Tags" Binding="{Binding}"/>
-            </DataGrid.Columns>
+        <DataGrid x:Name="DG_TagHistory" Grid.Row="3" AutoGenerateColumns="True" CanUserAddRows="False">
+            <!-- <DataGrid.Columns>                
+                <DataGridTextColumn Header="Release"   Binding="{Binding}"/>  
+                <DataGridTextColumn Header="Tag"       Binding="{Binding}"/>      
+                <DataGridTextColumn Header="TagDate"   Binding="{Binding}"/>  
+                <DataGridTextColumn Header="TagSHA"    Binding="{Binding}"/>   
+                <DataGridTextColumn Header="CommitSHA" Binding="{Binding}"/>
+            </DataGrid.Columns>  -->
         </DataGrid>
     </Grid>
 </Window>
@@ -51,6 +69,10 @@ Add-Type -AssemblyName PresentationFramework
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
+#endregion
+
+
+#region  ~~  CONTROLS  ~~
 # Get Controls
 $TB_Version    = $window.FindName("TB_Version")
 $BT_Verify     = $window.FindName("BT_Verify")
@@ -58,18 +80,66 @@ $BT_Publish    = $window.FindName("BT_Publish")
 $LB_Status     = $window.FindName("LB_Status")
 $DG_TagHistory = $window.FindName("DG_TagHistory")
 
+#endregion
+
+
+#region  ~~  FUNCTIONS  ~~
+
 # Get Tags
 function Get-GitTags {
-    git fetch --tags | Out-Null
-    git tag
+    git fetch --tags | Out-Null        
+
+    $Tags = git for-each-ref --format='%(refname:short) TAG_SHA=%(objectname) TAG_DATE=%(taggerdate:iso) COMMIT_SHA=%(*objectname)' refs/tags
+
+    foreach( $Item in $Tags)
+    {
+
+    Set-Location 'C:\Git\vcrs-cdw-db'
+        $R = $Item -split ' '
+
+        # REGEX EXPLANATION:
+        #
+        #   ^ — start of string
+        #   Release_ — literal
+        #   \d+ — one or more digits
+        #   \. — literal period
+        #   $ — end of string
+
+        #If the Tag matches the Release naming Convention. Add it.
+        if( $R[0] -match '^Release_\d+\.\d+\.\d+$' )
+        {
+
+            $NR = $DT.NewRow()
+            
+            $NR.Release    = [Version]( $R[0] -replace 'Release_' )
+            $NR.Tag        = $R[0]
+            $NR.TagDate    = [String]($R[2] -replace 'TAG_DATE=')
+            $NR.TagSHA     = [String]($R[1] -replace 'TAG_SHA=')
+            $NR.CommitSHA  = [String]($R[5] -replace 'COMMIT_SHA=')
+            
+            $DT.Rows.Add($NR)
+
+        }
+    }
+
+
 }
 
 # Populate DataGrid
 function Load-Tags {
-    $tags = Get-GitTags
-    $DG_TagHistory.ItemsSource = $tags
+    #$tags = Get-GitTags
+    Get-GitTags
+    $DG_TagHistory.ItemsSource = $DT.DefaultView #Automatically creates columns in Datagrid.
 }
 
+function Verify-Tag {
+
+}
+
+#endregion
+
+
+#region  ~~  EVENTS  ~~
 # Check Version
 $BT_Verify.Add_Click({
     $version = $TB_Version.Text.Trim()
@@ -109,8 +179,11 @@ $BT_Publish.Add_Click({
     }
 })
 
+#endregion
+
+
 # Load initial tag list
-#Load-Tags
+Load-Tags
 
 # Show GUI
 $window.ShowDialog() | Out-Null
