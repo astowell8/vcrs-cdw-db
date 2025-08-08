@@ -1,6 +1,5 @@
 #region  ~~  ABOUT  ~~
 
-
 # DEVELOPER NOTES:
 #
 #   Control Prefixes:
@@ -11,9 +10,17 @@
 #   (LB) Label
 #
 
+# ASSUMES:
+#   Version Tags are Annotated Tags. NOT LIGHTWEIGHT.
+#
+
 #endregion
 
 #region  ~~  DATA STRUCTURES  ~~
+Clear-Host
+
+$GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
+$DBOpsFolder = 'C:\Git\vcrs-cdw-dbops'
 
 $DT = New-Object System.Data.DataTable
 
@@ -22,6 +29,8 @@ $DT.Columns.Add('Tag'      ,[String])  | Out-Null
 $DT.Columns.Add('TagDate'  ,[String])  | Out-Null
 $DT.Columns.Add('TagSHA'   ,[String])  | Out-Null
 $DT.Columns.Add('CommitSHA',[String])  | Out-Null
+
+
 
 #endregion
 
@@ -37,22 +46,36 @@ Add-Type -AssemblyName PresentationFramework
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="BT_Browse_CDWDb"  Content="Browse"  Width="60" Margin="0,0,0,0"/>                         
+             <Label   Content="folder cdw-db:      " VerticalAlignment="Center"/>
+            <TextBox x:Name="TB_PathGitCDW" Width="250" Margin="10,0,0,0"/>
+        </StackPanel>       
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,10">
+            <Button x:Name="BT_Browse_CDWDbOps" Content="Browse"  Width="60" Margin="0,0,0,0"/>                 
+            <Label   Content="Folder cdw-dbops: " VerticalAlignment="Center"/>            
+            <TextBox x:Name="TB_PathGitDBOps" Width="250" Margin="10,0,0,0"/>
+        </StackPanel>        
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,10">
             <Label   X:Name="LB_EnterVersion" Content="Enter Version:" VerticalAlignment="Center"/>
             <TextBox x:Name="TB_Version" Width="150" Margin="10,0"/>
         </StackPanel>
         
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,10">
             <Button x:Name="BT_Verify"  Content="Verify"  Width="120" Margin="0,0,10,0"/>
             <Button x:Name="BT_Publish" Content="Publish" Width="120"/>
         </StackPanel>
         
-        <Label x:Name="LB_StatusMessage" Grid.Row="2" Foreground="Blue" FontWeight="Bold" Margin="0,0,0,10"/>
+        <Label x:Name="LB_Status" Grid.Row="4" Foreground="Blue" FontWeight="Bold" Margin="0,0,0,10"/>
 
-        <DataGrid x:Name="DG_TagHistory" Grid.Row="3" AutoGenerateColumns="True" CanUserAddRows="False">
+        <DataGrid x:Name="DG_TagHistory" Grid.Row="5" AutoGenerateColumns="True" CanUserAddRows="False">
             <!-- <DataGrid.Columns>                
                 <DataGridTextColumn Header="Release"   Binding="{Binding}"/>  
                 <DataGridTextColumn Header="Tag"       Binding="{Binding}"/>      
@@ -87,6 +110,9 @@ $DG_TagHistory = $window.FindName("DG_TagHistory")
 
 # Get Tags
 function Get-GitTags {
+
+    Set-Location $GitFolder 
+
     git fetch --tags | Out-Null        
 
     $Tags = git for-each-ref --format='%(refname:short) TAG_SHA=%(objectname) TAG_DATE=%(taggerdate:iso) COMMIT_SHA=%(*objectname)' refs/tags
@@ -94,7 +120,6 @@ function Get-GitTags {
     foreach( $Item in $Tags)
     {
 
-    Set-Location 'C:\Git\vcrs-cdw-db'
         $R = $Item -split ' '
 
         # REGEX EXPLANATION:
@@ -122,6 +147,9 @@ function Get-GitTags {
         }
     }
 
+    #Want to keep a sorted list.
+    #Get-ExistingVersions
+    #$ExistingVersions
 
 }
 
@@ -130,6 +158,18 @@ function Load-Tags {
     #$tags = Get-GitTags
     Get-GitTags
     $DG_TagHistory.ItemsSource = $DT.DefaultView #Automatically creates columns in Datagrid.
+}
+
+function Get-ExistingVersions {
+
+    $ExistingVersions = @()      
+    foreach( $Row in $DT.Rows ) {
+        $ExistingVersions += $Row.Release
+    }
+
+    $ExistingVersions = $ExistingVersions | Sort-Object -Descending    
+    
+    return $ExistingVersions
 }
 
 function Verify-Tag {
@@ -142,18 +182,30 @@ function Verify-Tag {
 #region  ~~  EVENTS  ~~
 # Check Version
 $BT_Verify.Add_Click({
+    
+    $LB_Status.Foreground = 'Blue'
+
+
+    #Version Info
+    $ExistingVersions = @()
+    $ExistingVersions = Get-ExistingVersions
     $version = $TB_Version.Text.Trim()
+    
+    # Check 1. Do we have an input version
     if (-not $version) {
         $LB_Status.Content = "Please enter a version number."
         return
     }
-
-    $tags = Get-GitTags
-    if ($tags -contains $version) {
-        $LB_Status.Content = "✅ Version $version exists."
+    elseif ( -not ($version -match '^\d+\.\d+\.\d+$') ) {  # Check 2. Are we given the correct version format?   ==> Major.Minor.Build
+       $LB_Status.Content = "Please enter a valid version number. Expecting Major.Minor.Build format."
+    } 
+    elseif ( $ExistingVersions[0] -gt $version ){ # Check 3. Is the version number newer than the current version.
+         $LB_Status.Content = ("Version number is older than " + $ExistingVersions[0] +". Please supply a newer version number.")
     } else {
-        $LB_Status.Content = "❌ Version $version does not exist."
+       $LB_Status.Content = "VALID"
+       $LB_Status.Foreground = 'Green'       
     }
+
 })
 
 # Submit Version
