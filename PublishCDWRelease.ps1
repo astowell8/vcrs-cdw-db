@@ -20,6 +20,8 @@
 Clear-Host
 
 $GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
+$GitFolder = 'C:\Git\vcrs-cdw-db'
+
 $DBOpsFolder = 'C:\Git\vcrs-cdw-dbops'
 
 $DT = New-Object System.Data.DataTable
@@ -30,13 +32,15 @@ $DT.Columns.Add('TagDate'  ,[String])  | Out-Null
 $DT.Columns.Add('TagSHA'   ,[String])  | Out-Null
 $DT.Columns.Add('CommitSHA',[String])  | Out-Null
 
-
+$
 
 #endregion
 
 
 #region  ~~  WPF XAML  ~~
 Add-Type -AssemblyName PresentationFramework
+
+Add-Type -AssemblyName System.Windows.Forms
 
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -96,12 +100,26 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 
 
 #region  ~~  CONTROLS  ~~
-# Get Controls
-$TB_Version    = $window.FindName("TB_Version")
-$BT_Verify     = $window.FindName("BT_Verify")
-$BT_Publish    = $window.FindName("BT_Publish")
-$LB_Status     = $window.FindName("LB_Status")
-$DG_TagHistory = $window.FindName("DG_TagHistory")
+
+
+# Buttons
+$BT_Browse_CDWDb    = $window.FindName("BT_Browse_CDWDb") 
+$BT_Browse_CDWDbOps = $window.FindName("BT_Browse_CDWDbOps")
+$BT_Verify          = $window.FindName("BT_Verify")
+$BT_Publish         = $window.FindName("BT_Publish")
+
+# TextBox
+$TB_PathGitCDW   = $window.FindName("TB_PathGitCDW")
+$TB_PathGitDBOps = $window.FindName("TB_PathGitDBOps")
+$TB_Version      = $window.FindName("TB_Version")
+
+$TB_PathGitCDW | Get-Member
+
+# Labels
+$LB_Status       = $window.FindName("LB_Status")
+
+# DataGrid
+$DG_TagHistory   = $window.FindName("DG_TagHistory")
 
 #endregion
 
@@ -124,11 +142,11 @@ function Get-GitTags {
 
         # REGEX EXPLANATION:
         #
-        #   ^ — start of string
-        #   Release_ — literal
-        #   \d+ — one or more digits
-        #   \. — literal period
-        #   $ — end of string
+        #   ^ ï¿½ start of string
+        #   Release_ ï¿½ literal
+        #   \d+ ï¿½ one or more digits
+        #   \. ï¿½ literal period
+        #   $ ï¿½ end of string
 
         #If the Tag matches the Release naming Convention. Add it.
         if( $R[0] -match '^Release_\d+\.\d+\.\d+$' )
@@ -176,11 +194,71 @@ function Verify-Tag {
 
 }
 
+# Passing the TextBox Control to the Function.
+function browse-folder {
+    param(
+        [System.Windows.Controls.TextBox] $TB
+    )
+
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+
+        $SelectedFolder = $( $dialog.SelectedPath )
+        if( Check-GitFolder $SelectedFolder)
+        {
+            $TB.Text = $( $dialog.SelectedPath )
+        } else {
+            $TB.Text = "SELECTED A NON GIT REPO FOLDER"
+        }
+    }
+}
+
+#Verifies that the path is a Git repo.
+function Check-GitFolder {
+    param(
+        [String] $path
+    )
+
+    [Bool] $IsGitFolder = $null
+
+    $path = $($Path + '\.git') -replace '\\','\'
+    If( Test-Path $Path ){ $IsGitFolder = $true } else { $IsGitFolder = $false }
+
+    return $IsGitFolder
+}
+
+function Clear-GitFolder {
+    param(
+        [System.Windows.Controls.TextBox] $TB
+    )
+
+    if( Test-Path $TB.Text) {
+        $TargetFolder = $TB.Text
+    } else {
+        $TargetFolder = ""
+        $LB_Status.Content = "No Target Git Folder Select."
+    }
+
+    if($TargetFolder -ne ""){
+        Set-Location $TargetFolder
+
+        Get-ChildItem | 
+            Where-Object { $_.Name.ToUpper() -notin '.GITHUB', '.GIT' } |
+            ForEach-Object {
+                Write-Host $("Removing: " + $_.FullName)
+                Remove-Item -Path $_.FullName -Recurse -Force
+            }    
+    }
+
+}
+
 #endregion
 
 
 #region  ~~  EVENTS  ~~
-# Check Version
+
+
+# BUTTON CLICKS
 $BT_Verify.Add_Click({
     
     $LB_Status.Foreground = 'Blue'
@@ -210,27 +288,15 @@ $BT_Verify.Add_Click({
 
 # Submit Version
 $BT_Publish.Add_Click({
-    $version = $TB_Version.Text.Trim()
-    if (-not $version) {
-        $LB_Status.Content = "Please enter a version number."
-        return
-    }
 
-    $tags = Get-GitTags
-    if ($tags -contains $version) {
-        $LB_Status.Content = "âš ï¸ Version already exists. Submission skipped."
-    } else {
-        try {
-            git tag $version
-            git push origin $version
-            $LB_Status.Content = "âœ… Version $version submitted successfully."
-            Load-Tags
-        } catch {
-            $LB_Status.Content = "âŒ Failed to submit version: $_"
-        }
-    }
+    Clear-GitFolder $TB_PathGitDBOps
+    Write-Host ("Clearing Git Folder: " + $TB_PathGitDBOps.Text)
+
 })
 
+$BT_Browse_CDWDb.Add_Click({browse-folder $TB_PathGitCDW})
+
+$BT_Browse_CDWDbOps.Add_Click({browse-folder $TB_PathGitDBOps})
 #endregion
 
 
