@@ -100,7 +100,7 @@ Add-Type -AssemblyName System.Windows.Forms
                 <Label   X:Name="LB_EnterVersion" Content="Enter Version:" VerticalAlignment="Center"/>
                 <TextBox x:Name="TB_Version" Width="150" Margin="10,0"/>
                 <Button x:Name="BT_AddVersion"  Content="Add Version"  Width="120" Margin="0,0,10,0"/>
-                <Button x:Name="BT_Publish" Content="Publish" Width="120" IsEnabled="False" />           
+                <Button x:Name="BT_Publish" Content="Publish" Width="120" IsEnabled="True" />           
 
                 </StackPanel>
 
@@ -252,6 +252,7 @@ function Verify-Tag {
 
 }
 
+
 # Passing the TextBox Control to the Function.
 function browse-folder {
     param(
@@ -361,20 +362,25 @@ $BT_AddVersion.Add_Click({
     elseif ( $ExistingVersions[0] -gt $version ){ # Check 3. Is the version number newer than the current version.
          $LB_Status.Content = ("Version number is older than " + $ExistingVersions[0] +". Please supply a newer version number.")
     } else {
-       $LB_Status.Content = "VALID"
+       #$LB_Status.Content = "VALID"
        $LB_Status.Foreground = 'Green'   
-       $IsNewReleaseVersion = $true    
+       $IsNewVersion = $true    
     }
 
     #If New Version, create version tag then push to github.
-    if($IsNewReleaseVersion){
+    if($IsNewVersion){
         $NewVersionTag += $version
+
+        $LB_Status.Content = "Pushing new tag."     
+
         git tag -a $NewVersionTag -m $NewVersionTag        
         git push origin $NewVersionTag
         
         $LB_Status.Content = "New Version " + $version + " Added."
-    }
 
+        Load-Tags
+
+    }
 
 })
 
