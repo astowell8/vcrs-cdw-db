@@ -21,7 +21,7 @@ Clear-Host
 # 1. Verify Folders exist
 # 2. Verify Tags Exist
 
-git checkout main
+git checkout Main
 git fetch --tags
 git pull
 
