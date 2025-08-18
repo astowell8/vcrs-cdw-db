@@ -19,6 +19,10 @@
 #region  ~~  DATA STRUCTURES  ~~
 Clear-Host
 
+#Calculating Diff
+$Global:StartTag = $null
+$Global:EndingTag = $null
+
 $GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
 $GitFolder = 'C:\Git\vcrs-cdw-db'
 
@@ -26,13 +30,17 @@ $DBOpsFolder = 'C:\Git\vcrs-cdw-dbops'
 
 $DT = New-Object System.Data.DataTable
 
-$DT.Columns.Add('Release'  ,[Version]) | Out-Null
+$DT.Columns.Add('Diff'     ,[String])  | Out-Null
+$DT.Columns.Add('Version'  ,[Version]) | Out-Null
 $DT.Columns.Add('Tag'      ,[String])  | Out-Null
 $DT.Columns.Add('TagDate'  ,[String])  | Out-Null
 $DT.Columns.Add('TagSHA'   ,[String])  | Out-Null
 $DT.Columns.Add('CommitSHA',[String])  | Out-Null
 
-$
+$Diff = New-Object System.Data.DataTable
+
+$Diff.Columns.Add('FileName',[String]) | Out-Null
+$Diff.Columns.Add('FullName',[String]) | Out-Null
 
 #endregion
 
@@ -44,7 +52,7 @@ Add-Type -AssemblyName System.Windows.Forms
 
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        Title="CDW Release Version Tagger" Height="400" Width="600">
+        Title="CDW Release Version Tagger" Height="500" Width="800">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -55,33 +63,67 @@ Add-Type -AssemblyName System.Windows.Forms
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button x:Name="BT_Browse_CDWDb"  Content="Browse"  Width="60" Margin="0,0,0,0"/>                         
-             <Label   Content="folder cdw-db:      " VerticalAlignment="Center"/>
-            <TextBox x:Name="TB_PathGitCDW" Width="250" Margin="10,0,0,0"/>
-        </StackPanel>       
-
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,10">
-            <Button x:Name="BT_Browse_CDWDbOps" Content="Browse"  Width="60" Margin="0,0,0,0"/>                 
-            <Label   Content="Folder cdw-dbops: " VerticalAlignment="Center"/>            
-            <TextBox x:Name="TB_PathGitDBOps" Width="250" Margin="10,0,0,0"/>
-        </StackPanel>        
-
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,10">
-            <Label   X:Name="LB_EnterVersion" Content="Enter Version:" VerticalAlignment="Center"/>
-            <TextBox x:Name="TB_Version" Width="150" Margin="10,0"/>
-        </StackPanel>
+        <GroupBox  Grid.Row="0" Header="Git Folders - CDW / DBOps" Padding="10">
         
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,10,0,10">
-            <Button x:Name="BT_Verify"  Content="Verify"  Width="120" Margin="0,0,10,0"/>
-            <Button x:Name="BT_Publish" Content="Publish" Width="120"/>
-        </StackPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>       
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                    <Button x:Name="BT_Browse_CDWDb"  Content="Browse"  Width="60" Margin="0,0,0,0"/>                         
+                     <Label   Content="CDW:   " VerticalAlignment="Center"/>
+                    <TextBox x:Name="TB_PathGitCDW" Width="250" Margin="10,0,0,0"/>
+                </StackPanel>       
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,10">
+                    <Button x:Name="BT_Browse_CDWDbOps" Content="Browse"  Width="60" Margin="0,0,0,0"/>                 
+                    <Label   Content="DBOps: " VerticalAlignment="Center"/>            
+                    <TextBox x:Name="TB_PathGitDBOps" Width="250" Margin="10,0,0,0"/>
+                </StackPanel>        
+
+            </Grid>
+
+        </GroupBox>
+
+        <GroupBox  Grid.Row="1" Header="New Release Tag" Padding="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>       
+                
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,0">
+                <Label   X:Name="LB_EnterVersion" Content="Enter Version:" VerticalAlignment="Center"/>
+                <TextBox x:Name="TB_Version" Width="150" Margin="10,0"/>
+                <Button x:Name="BT_Verify"  Content="Verify"  Width="120" Margin="0,0,10,0"/>
+                <Button x:Name="BT_Publish" Content="Publish" Width="120"/>           
+
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,0">
+                    <Label x:Name="LB_Status" Grid.Row="4" Foreground="Blue" FontWeight="Bold" Margin="0,0,0,0"/> 
+                </StackPanel>
+
+            </Grid>
+        </GroupBox>        
+
+<!--        <GroupBox Grid.Row="3" Header="Diff Tags" Padding="10">        
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
+                <Label   X:Name="LB_StartTag" Content="Start Tag:" VerticalAlignment="Center"/>
+                <TextBox x:Name="TB_StartTag" Width="150" Margin="10,0"/>               
+                <Label   X:Name="LB_EndTag" Content="End Tag:" VerticalAlignment="Center"/>            
+                <TextBox x:Name="TB_EndTag" Width="150" Margin="10,0"/> 
+                <Button x:Name="BT_FindDiff" Content="Find Diff" Width="120"/>                                   
+            </StackPanel>
+        </GroupBox>        
+-->
         
-        <Label x:Name="LB_Status" Grid.Row="4" Foreground="Blue" FontWeight="Bold" Margin="0,0,0,10"/>
 
         <DataGrid x:Name="DG_TagHistory" Grid.Row="5" AutoGenerateColumns="True" CanUserAddRows="False">
             <!-- <DataGrid.Columns>                
-                <DataGridTextColumn Header="Release"   Binding="{Binding}"/>  
+                <DataGridTextColumn Header="Version"   Binding="{Binding}"/>  
                 <DataGridTextColumn Header="Tag"       Binding="{Binding}"/>      
                 <DataGridTextColumn Header="TagDate"   Binding="{Binding}"/>  
                 <DataGridTextColumn Header="TagSHA"    Binding="{Binding}"/>   
@@ -107,13 +149,12 @@ $BT_Browse_CDWDb    = $window.FindName("BT_Browse_CDWDb")
 $BT_Browse_CDWDbOps = $window.FindName("BT_Browse_CDWDbOps")
 $BT_Verify          = $window.FindName("BT_Verify")
 $BT_Publish         = $window.FindName("BT_Publish")
+#$BT_FindDiff        = $window.FindName("BT_FindDiff")
 
 # TextBox
 $TB_PathGitCDW   = $window.FindName("TB_PathGitCDW")
 $TB_PathGitDBOps = $window.FindName("TB_PathGitDBOps")
 $TB_Version      = $window.FindName("TB_Version")
-
-$TB_PathGitCDW | Get-Member
 
 # Labels
 $LB_Status       = $window.FindName("LB_Status")
@@ -128,6 +169,9 @@ $DG_TagHistory   = $window.FindName("DG_TagHistory")
 
 # Get Tags
 function Get-GitTags {
+
+    $Global:StartTag = $null
+    $Global:EndingTag = $null
 
     Set-Location $GitFolder 
 
@@ -154,7 +198,7 @@ function Get-GitTags {
 
             $NR = $DT.NewRow()
             
-            $NR.Release    = [Version]( $R[0] -replace 'Release_' )
+            $NR.Version    = [Version]( $R[0] -replace 'Release_' )
             $NR.Tag        = $R[0]
             $NR.TagDate    = [String]($R[2] -replace 'TAG_DATE=')
             $NR.TagSHA     = [String]($R[1] -replace 'TAG_SHA=')
@@ -163,6 +207,18 @@ function Get-GitTags {
             $DT.Rows.Add($NR)
 
         }
+    }
+
+    #Sorted Descending
+    $VersionList = Get-ExistingVersions
+
+
+    $Global:EndingTag = $VersionList[0]
+    $Global:StartTag  = $VersionList[1]
+
+    foreach($row in $DT){
+       If( $row.Version -eq $Global:EndingTag ){$row.Diff = 'END'}
+       If( $row.Version -eq $Global:StartTag ){$row.Diff = 'START'}
     }
 
     #Want to keep a sorted list.
@@ -182,7 +238,7 @@ function Get-ExistingVersions {
 
     $ExistingVersions = @()      
     foreach( $Row in $DT.Rows ) {
-        $ExistingVersions += $Row.Release
+        $ExistingVersions += $Row.Version
     }
 
     $ExistingVersions = $ExistingVersions | Sort-Object -Descending    
@@ -248,7 +304,23 @@ function Clear-GitFolder {
                 Write-Host $("Removing: " + $_.FullName)
                 Remove-Item -Path $_.FullName -Recurse -Force
             }    
+
+        git add .
+        git commit -m "Cleared Repo"
     }
+
+}
+
+function Calculate-Diff {
+    param (
+        [String] $StartTag,
+        [String] $EndingTag
+    )
+    
+
+    $Files = ( git diff  $StartTag $EndingTag )
+
+    Write-Host $Files
 
 }
 
@@ -294,9 +366,12 @@ $BT_Publish.Add_Click({
 
 })
 
+
 $BT_Browse_CDWDb.Add_Click({browse-folder $TB_PathGitCDW})
 
 $BT_Browse_CDWDbOps.Add_Click({browse-folder $TB_PathGitDBOps})
+
+#$BT_FindDiff.Add_Click({})
 #endregion
 
 
