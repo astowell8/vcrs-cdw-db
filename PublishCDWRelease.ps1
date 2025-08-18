@@ -359,6 +359,8 @@ function Copy-GitDiff {
         Copy-Item -LiteralPath $_ -Destination $(  ($_.replace($GitFolder,$ReviewFolder) ) )
     }
 
+    Set-Location $Global:GitReviewFolder
+
     Git add .
     Git commit -m $Global:EndingTag
 
@@ -417,18 +419,49 @@ $BT_AddVersion.Add_Click({
 
 })
 
+#EXPECTED BRANCH NAMES NEED TO BE VARIABLES.
 # Submit Version
 $BT_Publish.Add_Click({
 
-    Clear-GitFolder $TB_PathGitDBOps
+    Set-Location $Global:GitReviewFolder
 
-    Write-Host ("Clearing Git Folder: " + $TB_PathGitDBOps.Text)
+    $HasReleaseBranch = $false
+    $HasOrigin = $false
+    #1. If Release doesn't exist create it. Then checkout release
 
+    git checkout main | out-null
+
+    if( 'release' -in $(git branch --list 'release')){
+        git checkout release
+    } else {
+        git checkout -b 'release'
+    }
+
+    #Need to know if there is an expected remoted branch
+    if( 'remotes/origin/release' -in $(git branch --all )){
+        $HasOrigin = $true
+    } 
+
+    
+    #2. Clear release folder.
+    Clear-GitFolder $Global:GitReviewFolder
+
+    Write-Host ("Clearing Git Folder: " + $Global:GitReviewFolder)
+
+    #3. Got to Source folder. Get Diff and copy files.
     Set-Location $Global:GitFolder 
 
     Copy-GitDiff
     #Calculate-Diff $Global:StartTag $Global:EndingTag
     #Get-GitDiff #| Write-Host
+
+    #4. Push Diff
+    if($HasOrigin){
+        git push
+    } else {
+        git push --set-upstream origin release
+    }
+
 })
 
 #Browse to the source git folder.
