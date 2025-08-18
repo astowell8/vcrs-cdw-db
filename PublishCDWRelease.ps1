@@ -172,6 +172,8 @@ $DG_TagHistory   = $window.FindName("DG_TagHistory")
 # Get Tags
 function Get-GitTags {
 
+    $DT.Rows.Clear()
+
     $Global:StartTag = $null
     $Global:EndingTag = $null
 
