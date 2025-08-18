@@ -371,6 +371,8 @@ $BT_AddVersion.Add_Click({
         $NewVersionTag += $version
         git tag -a $NewVersionTag -m $NewVersionTag        
         git push origin $NewVersionTag
+        
+        $LB_Status.Content = "New Version " + $version + " Added."
     }
 
 
