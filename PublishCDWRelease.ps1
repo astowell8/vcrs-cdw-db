@@ -12,7 +12,7 @@
 
 # ASSUMES:
 #   Version Tags are Annotated Tags. NOT LIGHTWEIGHT.
-#
+#   Applying a version tag to the most recent commit
 
 #endregion
 
@@ -23,8 +23,10 @@ Clear-Host
 $Global:StartTag = $null
 $Global:EndingTag = $null
 
-$GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
-$GitFolder = 'C:\Git\vcrs-cdw-db'
+#DEBUG
+#$GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
+#$GitFolder = 'C:\Git\vcrs-cdw-db'
+$Global:GitFolder = $null
 
 $DBOpsFolder = 'C:\Git\vcrs-cdw-dbops'
 
@@ -97,8 +99,8 @@ Add-Type -AssemblyName System.Windows.Forms
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,0">
                 <Label   X:Name="LB_EnterVersion" Content="Enter Version:" VerticalAlignment="Center"/>
                 <TextBox x:Name="TB_Version" Width="150" Margin="10,0"/>
-                <Button x:Name="BT_Verify"  Content="Verify"  Width="120" Margin="0,0,10,0"/>
-                <Button x:Name="BT_Publish" Content="Publish" Width="120"/>           
+                <Button x:Name="BT_AddVersion"  Content="Add Version"  Width="120" Margin="0,0,10,0"/>
+                <Button x:Name="BT_Publish" Content="Publish" Width="120" IsEnabled="False" />           
 
                 </StackPanel>
 
@@ -147,7 +149,7 @@ $window = [Windows.Markup.XamlReader]::Load($reader)
 # Buttons
 $BT_Browse_CDWDb    = $window.FindName("BT_Browse_CDWDb") 
 $BT_Browse_CDWDbOps = $window.FindName("BT_Browse_CDWDbOps")
-$BT_Verify          = $window.FindName("BT_Verify")
+$BT_AddVersion          = $window.FindName("BT_AddVersion")
 $BT_Publish         = $window.FindName("BT_Publish")
 #$BT_FindDiff        = $window.FindName("BT_FindDiff")
 
@@ -173,7 +175,7 @@ function Get-GitTags {
     $Global:StartTag = $null
     $Global:EndingTag = $null
 
-    Set-Location $GitFolder 
+    Set-Location $Global:GitFolder 
 
     git fetch --tags | Out-Null        
 
@@ -256,6 +258,8 @@ function browse-folder {
         [System.Windows.Controls.TextBox] $TB
     )
 
+    $SelectedFolder = $null
+
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
 
@@ -265,8 +269,11 @@ function browse-folder {
             $TB.Text = $( $dialog.SelectedPath )
         } else {
             $TB.Text = "SELECTED A NON GIT REPO FOLDER"
+            $SelectedFolder = $null
         }
     }
+
+    return $SelectedFolder
 }
 
 #Verifies that the path is a Git repo.
@@ -331,10 +338,12 @@ function Calculate-Diff {
 
 
 # BUTTON CLICKS
-$BT_Verify.Add_Click({
+$BT_AddVersion.Add_Click({
     
     $LB_Status.Foreground = 'Blue'
 
+    $IsNewVersion = $false
+    $NewVersionTag = 'Release_'
 
     #Version Info
     $ExistingVersions = @()
@@ -353,8 +362,17 @@ $BT_Verify.Add_Click({
          $LB_Status.Content = ("Version number is older than " + $ExistingVersions[0] +". Please supply a newer version number.")
     } else {
        $LB_Status.Content = "VALID"
-       $LB_Status.Foreground = 'Green'       
+       $LB_Status.Foreground = 'Green'   
+       $IsNewReleaseVersion = $true    
     }
+
+    #If New Version, create version tag then push to github.
+    if($IsNewReleaseVersion){
+        $NewVersionTag += $version
+        git tag -a $NewVersionTag -m $NewVersionTag        
+        git push origin $NewVersionTag
+    }
+
 
 })
 
@@ -366,8 +384,15 @@ $BT_Publish.Add_Click({
 
 })
 
+#Browse to the source git folder.
+#  If valid, assign the path to the GitFolder Variable.
+#  Then Load version history.
+$BT_Browse_CDWDb.Add_Click({
+    $Global:GitFolder = browse-folder $TB_PathGitCDW
+     # Load initial tag list
+    Load-Tags
 
-$BT_Browse_CDWDb.Add_Click({browse-folder $TB_PathGitCDW})
+})
 
 $BT_Browse_CDWDbOps.Add_Click({browse-folder $TB_PathGitDBOps})
 
@@ -375,8 +400,6 @@ $BT_Browse_CDWDbOps.Add_Click({browse-folder $TB_PathGitDBOps})
 #endregion
 
 
-# Load initial tag list
-Load-Tags
 
 # Show GUI
 $window.ShowDialog() | Out-Null
