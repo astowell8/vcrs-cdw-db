@@ -291,7 +291,7 @@ function Check-GitFolder {
         [String] $path
     )
 
-    [Bool] $IsGitFolder = $null
+    [Bool] $IsGitFolder = $false
 
     $path = $($Path + '\.git') -replace '\\','\'
     If( Test-Path $Path ){ $IsGitFolder = $true } else { $IsGitFolder = $false }
@@ -356,7 +356,15 @@ function Copy-GitDiff {
 
     Get-GitDiff | ForEach-Object {
         Write-Host ('Review File: ' + $_)
+
+        #Make Sure folders Exist
+        If( -not (Test-Path (Split-Path $_ -Parent)) ){
+            New-Item -ItemType Directory $(Split-Path $_ -Parent)
+        }
+
         Copy-Item -LiteralPath $_ -Destination $(  ($_.replace($GitFolder,$ReviewFolder) ) )
+        #New-Item  $_ -Destination $(  ($_.replace($GitFolder,$ReviewFolder) ) )        
+
     }
 
     Set-Location $Global:GitReviewFolder
@@ -423,7 +431,7 @@ $BT_AddVersion.Add_Click({
 # Submit Version
 $BT_Publish.Add_Click({
 
-    Set-Location $Global:GitReviewFolder
+    Set-Location $TB_PathGitDBOps.Text
 
     $HasReleaseBranch = $false
     $HasOrigin = $false
@@ -431,10 +439,12 @@ $BT_Publish.Add_Click({
 
     git checkout main | out-null
 
+    #fix
     if( 'release' -in $(git branch --list 'release')){
         git checkout release
     } else {
-        git checkout -b 'release'
+        git branch 'release'
+        git checkout 'release'
     }
 
     #Need to know if there is an expected remoted branch
@@ -444,7 +454,7 @@ $BT_Publish.Add_Click({
 
     
     #2. Clear release folder.
-    Clear-GitFolder $Global:GitReviewFolder
+    Clear-GitFolder $TB_PathGitDBOps
 
     Write-Host ("Clearing Git Folder: " + $Global:GitReviewFolder)
 
