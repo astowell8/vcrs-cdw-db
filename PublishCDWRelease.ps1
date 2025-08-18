@@ -27,6 +27,7 @@ $Global:EndingTag = $null
 #$GitFolder = 'C:\Git\MockRepo\vcrs-cdw-db'
 #$GitFolder = 'C:\Git\vcrs-cdw-db'
 $Global:GitFolder = $null
+$Global:GitReviewFolder = $null
 
 $DBOpsFolder = 'C:\Git\vcrs-cdw-dbops'
 
@@ -216,13 +217,18 @@ function Get-GitTags {
     #Sorted Descending
     $VersionList = Get-ExistingVersions
 
-
-    $Global:EndingTag = $VersionList[0]
-    $Global:StartTag  = $VersionList[1]
+    $Global:EndingTag = $null #$VersionList[0]
+    $Global:StartTag  = $null #$VersionList[1]
 
     foreach($row in $DT){
-       If( $row.Version -eq $Global:EndingTag ){$row.Diff = 'END'}
-       If( $row.Version -eq $Global:StartTag ){$row.Diff = 'START'}
+        If( $row.Version -eq $VersionList[0] ){
+            $row.Diff = 'END'
+            $Global:EndingTag = $row.Tag
+        }
+        If( $row.Version -eq $VersionList[1] ){
+            $row.Diff = 'START'
+            $Global:StartTag = $row.Tag
+        }
     }
 
     #Want to keep a sorted list.
@@ -321,6 +327,15 @@ function Clear-GitFolder {
 
 }
 
+function Get-GitDiff {
+    
+    $Files = ( 
+        git diff --name-only $StartTag $EndingTag | ForEach-Object { (Resolve-Path $_).Path}
+    )
+    return $Files
+
+}
+
 function Calculate-Diff {
     param (
         [String] $StartTag,
@@ -331,6 +346,22 @@ function Calculate-Diff {
     $Files = ( git diff  $StartTag $EndingTag )
 
     Write-Host $Files
+
+}
+
+function Copy-GitDiff {
+
+    $GitFolder = $Global:GitFolder
+    $ReviewFolder = $Global:GitReviewFolder
+
+    Get-GitDiff | ForEach-Object {
+        Write-Host ('Review File: ' + $_)
+        Copy-Item -LiteralPath $_ -Destination $(  ($_.replace($GitFolder,$ReviewFolder) ) )
+    }
+
+    Git add .
+    Git commit -m $Global:EndingTag
+
 
 }
 
@@ -390,8 +421,14 @@ $BT_AddVersion.Add_Click({
 $BT_Publish.Add_Click({
 
     Clear-GitFolder $TB_PathGitDBOps
+
     Write-Host ("Clearing Git Folder: " + $TB_PathGitDBOps.Text)
 
+    Set-Location $Global:GitFolder 
+
+    Copy-GitDiff
+    #Calculate-Diff $Global:StartTag $Global:EndingTag
+    #Get-GitDiff #| Write-Host
 })
 
 #Browse to the source git folder.
@@ -404,7 +441,10 @@ $BT_Browse_CDWDb.Add_Click({
 
 })
 
-$BT_Browse_CDWDbOps.Add_Click({browse-folder $TB_PathGitDBOps})
+$BT_Browse_CDWDbOps.Add_Click({
+    $Global:GitReviewFolder =  browse-folder $TB_PathGitDBOps
+
+})
 
 #$BT_FindDiff.Add_Click({})
 #endregion
