@@ -123,6 +123,10 @@ $diff_files | ForEach-Object {
     write-host "Set-location $oldpath"
     Set-Location $oldpath
 
+    #LEFT OFF HERE ... Need to cycle through $diff_hash. make sure to exclude removed files.
+    #   SEE COMMENTS ABOVE.
+
+
     #Git doesn't understand windows path.
     git checkout $start_tag -- $oldfile
 
