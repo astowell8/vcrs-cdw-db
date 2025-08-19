@@ -3,6 +3,9 @@
 #  1. Between two tags
 #  2. Make sure files that were added later aren't include.
 
+# BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
+# THERE Can't be any inprogress work.
+
 Clear-Host
 
 #region  ~~  INPUT  ~~
