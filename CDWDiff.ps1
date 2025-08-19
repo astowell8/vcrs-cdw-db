@@ -26,6 +26,7 @@ $path_dbops = 'C:\Git\MockRepo\vcrs-cdw-dbops'
 $cdw_main = 'Main'
 $dbops_main = 'Main'
 $dbops_release_branch = $( 'Release_' + $start_tag.replace('Release_','') + '_to_' + $end_tag.Replace('Release_','') )
+$dbops_release_content = 'ReleaseContent' # Holds the new/modified files. 
 
 $Head_Sha = ''
 
@@ -111,6 +112,7 @@ Set-Location $path_cdw
 
 #checkout the files
 #  filekey - filename andkey
+#  HANDLE START TAG CONTENT
 foreach($filekey in $diff_hash.Keys)
 {
     # Tracks if a file existed during the time of the starttag and endtag.
@@ -154,6 +156,60 @@ foreach($filekey in $diff_hash.Keys)
         Write-Host ( "File Excluded:  " + $filekey )
     }
 }
+
+Set-Location $path_dbops 
+
+git add .
+git commit -m "$start_tag"
+
+git checkout $dbops_release_branch
+git branch $dbops_release_content
+git checkout $dbops_release_content
+
+Set-Location $path_cdw
+
+foreach($filekey in $diff_hash.Keys)
+{
+    # Tracks if a file existed during the time of the starttag and endtag.
+    #   Used for determining  if a file is new or deleted between the tag range.
+    [bool] $ExistsAtStartTag = $diff_hash[$filekey].Start
+    [bool] $ExistsAtEndTag   = $diff_hash[$filekey].End
+
+    #If the file doesn't exist at the time of  the end tag. The file was deleted. Exclude it.
+    if($ExistsAtEndTag){
+
+        $oldfile = Split-Path $filekey -Leaf
+        $oldpath = (split-path $filekey -Parent ) + '\'
+
+        $newfile = $oldfile
+        $newpath = $oldpath.replace($path_cdw,$path_dbops)
+
+        #$path = $(Split-Path $olditem  -Parent).replace($path_cdw,$path_dbops)
+
+        Write-Host $( "Working Item:  " + $oldfile )
+
+        #write-host "Set-location $oldpath"
+        Set-Location $oldpath
+
+        #Git doesn't understand windows path.
+        git checkout $end_tag -- $oldfile
+
+        If( -not (Test-Path $newpath )){
+            New-Item -ItemType Directory $newpath -Force | Out-Null
+        }
+
+        Copy-Item -LiteralPath $($oldpath+$oldfile) -Destination $($newpath+$newitem) -Force | Out-Null   
+
+    } else {
+        Write-Host ( "File Excluded:  " + $filekey )
+    }
+}
+
+Set-Location $path_dbops 
+
+git add .
+git commit -m "$end_tag"
+
 
 <#
 $diff_files | ForEach-Object {
