@@ -230,6 +230,9 @@ foreach($filekey in $diff_hash.Keys)
     }
 }
 
+#ONCE WE ARE Done Copying Files. We want to reattach to HEAD
+git checkout $cdw_main
+
 Set-Location $path_dbops 
 
 git add .
@@ -255,49 +258,5 @@ if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_content) ) ){
 } else {
     git push    
 }
-
-
-<#
-$diff_files | ForEach-Object {
-
-    $oldfile = Split-Path $_ -Leaf
-    $oldpath = (split-path $_ -Parent ) + '\'
-
-    $newfile = $oldfile
-    $newpath = $oldpath.replace($path_cdw,$path_dbops)
-
-    #$path = $(Split-Path $olditem  -Parent).replace($path_cdw,$path_dbops)
-
-    Write-Host $( "Working Item:  " + $oldfile )
-
-    write-host "Set-location $oldpath"
-    Set-Location $oldpath
-
-    #LEFT OFF HERE ... Need to cycle through $diff_hash. make sure to exclude removed files.
-    #   SEE COMMENTS ABOVE.
-
-
-
-
-    #Git doesn't understand windows path.
-    git checkout $start_tag -- $oldfile
-
-    If( -not (Test-Path $newpath )){
-        New-Item -ItemType Directory $newpath -Force | Out-Null
-    }
-
-    Copy-Item -LiteralPath $($oldpath+$oldfile) -Destination $($newpath+$newitem) -Force | Out-Null
-
-}
-
-Set-Location $path_dbops 
-
-git add .
-git commit -m "$start_tag"
-
-Set-Location $path_cdw
-
-
-#>
 
 #endregion
