@@ -15,7 +15,7 @@ $end_tag = 'Release_1.0.6'
 
 
 
-#Git Repo
+#Git variables
 
 $path_cdw = 'C:\Git\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
 $path_dbops = 'C:\Git\vcrs-cdw-dbops' 
@@ -24,7 +24,9 @@ $cdw_main = 'Main'
 $dbops_main = 'master'
 $dbops_release_branch = $( 'Release_' + $start_tag.replace('Release_','') + '_to_' + $end_tag.Replace('Release_','') )
 
-Write-Host $dbops_release_branch
+$Head_Sha = ''
+
+
 #endregion
 
 #region  ~~  FUNCTION  ~~
@@ -46,8 +48,14 @@ git checkout $cdw_main
 git fetch --all --tags
 git pull
 
+$head_sha = (git rev-parse HEAD)
+
 $diff_files = (git diff --name-only $start_tag $end_tag | ForEach-Object { (Resolve-Path $_).Path})
 #$diff_files = (git diff $start_tag $end_tag --name-only)
+
+# We need to identify if the file exists during the starting tag and the ending tag.
+# If not at the starting tag but at the ending tag. NEW FILE
+# If at the starting but not at the ending tag. DELETED FILE. Exclude.
 
 $diff_hash = @{}
 foreach( $File in $diff_files )
@@ -69,6 +77,8 @@ foreach($file in $diff_hash.keys){
     if(Test-Path $file){ $diff_hash[$file].End = $true}
 }
 
+#Reattach back to HEAD
+git checkout main
 
 Write-Host
 Write-Host "Show Diff Files ..."
