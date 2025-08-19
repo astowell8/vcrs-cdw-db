@@ -35,6 +35,23 @@ $Head_Sha = ''
 
 #region  ~~  FUNCTION  ~~
 
+function Check-BranchExists {
+    param(
+        [String] $Branch
+    )
+
+    [bool] $BranchExists = $false
+
+    $BranchList = @(git branch --all).replace('* ','').trim()
+
+    foreach($Item in $BranchList )
+    {
+        if( $Branch -eq $Item ){ $BranchExists = $true }
+    }
+
+    return $BranchExists
+}
+
 #endregion
 
 
@@ -103,7 +120,11 @@ Get-ChildItem |
 git add .
 git commit -m "Cleared dbops folder"
 
-git branch $dbops_release_branch
+#If branch doesn't exists, create it.
+if( -not ( Check-BranchExists $dbops_release_branch ) ){
+    git branch $dbops_release_branch
+}
+
 git checkout $dbops_release_branch
 
 Set-Location $path_cdw
@@ -122,7 +143,6 @@ foreach($filekey in $diff_hash.Keys)
 
     #If the file doesn't exist at the time of  the end tag. The file was deleted. Exclude it.
     if($ExistsAtEndTag){
-
 
         $oldfile = Split-Path $filekey -Leaf
         $oldpath = (split-path $filekey -Parent ) + '\'
@@ -163,7 +183,12 @@ git add .
 git commit -m "$start_tag"
 
 git checkout $dbops_release_branch
-git branch $dbops_release_content
+
+#If branch doesn't exists, create it.
+if( -not ( Check-BranchExists $dbops_release_content ) ){
+    git branch $dbops_release_content
+}
+
 git checkout $dbops_release_content
 
 Set-Location $path_cdw
@@ -209,6 +234,27 @@ Set-Location $path_dbops
 
 git add .
 git commit -m "$end_tag"
+
+git checkout $dbops_release_branch
+
+#"remotes/origin/Main"
+#"remotes/origin/Release_1.0.1_to_1.0.6"
+
+#If remote branch doesn't exists, set-upstream. otherwise push
+if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_branch) ) ){
+    git push --set-upstream origin $dbops_release_branch
+} else {
+    git push    
+}
+
+git checkout $dbops_release_content
+
+#If remote branch doesn't exists, set-upstream. otherwise push
+if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_content) ) ){
+    git push --set-upstream origin $dbops_release_content
+} else {
+    git push    
+}
 
 
 <#
