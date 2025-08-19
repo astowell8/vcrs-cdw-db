@@ -115,11 +115,8 @@ foreach($filekey in $diff_hash.Keys)
 {
     # Tracks if a file existed during the time of the starttag and endtag.
     #   Used for determining  if a file is new or deleted between the tag range.
-    [bool] $ExistsAtStartTag
-    [bool] $ExistsAtEndTag
-
-    $ExistsAtStartTag = $diff_hash[$filekey].Start
-    $ExistsAtEndTag   = $diff_hash[$filekey].End
+    [bool] $ExistsAtStartTag = $diff_hash[$filekey].Start
+    [bool] $ExistsAtEndTag   = $diff_hash[$filekey].End
 
     #If the file doesn't exist at the time of  the end tag. The file was deleted. Exclude it.
     if($ExistsAtEndTag){
