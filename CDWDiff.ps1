@@ -24,7 +24,7 @@ $path_cdw   = 'C:\Git\MockRepo\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
 $path_dbops = 'C:\Git\MockRepo\vcrs-cdw-dbops' 
 
 $cdw_main = 'Main'
-$dbops_main = 'master'
+$dbops_main = 'Main'
 $dbops_release_branch = $( 'Release_' + $start_tag.replace('Release_','') + '_to_' + $end_tag.Replace('Release_','') )
 
 $Head_Sha = ''
