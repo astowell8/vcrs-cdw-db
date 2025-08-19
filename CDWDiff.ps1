@@ -6,32 +6,67 @@
 # BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
 # THERE Can't be any inprogress work.
 
+#PREREQUISITE
+#  GitHub CLI
+#    gh auth login --hostname github.com --git-protocol https --web
+#    Registers Your device with GitHub. Shouldn't need to do this multiple times.
+
 Clear-Host
 
 #region  ~~  INPUT  ~~
 
-$start_tag = 'Release_1.0.1'
-$end_tag   = 'Release_1.0.6'
+#$start_tag = 'Release_1.0.1'
+#$end_tag   = 'Release_1.0.6'
 
-
+$start_tag = 'release_25.4.0'
+$end_tag   = 'release_24.4.7'
 
 #Git variables
 
-#$path_cdw   = 'C:\Git\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
-#$path_dbops = 'C:\Git\vcrs-cdw-dbops' 
+$path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
+$path_dbops = 'C:\Git\CDW\vcrs-cdw-dbops' 
 
-$path_cdw   = 'C:\Git\MockRepo\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
-$path_dbops = 'C:\Git\MockRepo\vcrs-cdw-dbops' 
+#$path_cdw   = 'C:\Git\MockRepo\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
+#$path_dbops = 'C:\Git\MockRepo\vcrs-cdw-dbops' 
 
-$cdw_main = 'Main'
-$dbops_main = 'Main'
-$dbops_release_branch = $( 'Release_' + $start_tag.replace('Release_','') + '_to_' + $end_tag.Replace('Release_','') )
+$cdw_main = 'main'
+$dbops_main = 'main'
+$dbops_release_branch = $( 'Release_' + $start_tag.ToUpper().replace('RELEASE_','') + '_to_' + $end_tag.ToUpper().Replace('RELEASE_','') ) #handle case-sensitive.
 $dbops_release_content = 'ReleaseContent' # Holds the new/modified files. 
 
 $Head_Sha = ''
 
 
 #endregion
+
+#region  ~~  CHECK  ~~
+
+if( -not (test-path ($path_cdw + '\.git')))
+{
+    Write-Host 'CDW-DB Path ($path_cdw) is not a git folder.' -ForegroundColor Red
+    Read-Host "Press any key to exit.  "
+    exit
+}
+
+if( -not (test-path ($path_dbops + '\.git')))
+{
+    Write-Host 'CDW-DBOPS path ($path_dbops) is not git folder.' -ForegroundColor Red
+    Read-Host "Press any key to exit.  "
+    exit
+}
+
+if(Get-Command gh -ErrorAction SilentlyContinue)
+{
+    Write-Host "GitHub CLI is Installed."
+} else {
+    Write-Host "GitHub CLI is NOT installed and is required." -ForegroundColor Red
+    Write-Host "  Installed GitHub CLI before rerun this script."
+    Read-Host "Press any key to exit.  "
+    exit
+}
+
+#endregion
+
 
 #region  ~~  FUNCTION  ~~
 
@@ -87,14 +122,14 @@ foreach( $File in $diff_files )
 git checkout $start_tag #Detach the repo to the state of starting tag.
 
 foreach($file in $diff_hash.keys){
-    write-Host $file
+    write-Host $file -ForegroundColor Cyan
     if(Test-Path $file){ $diff_hash[$file].Start = $true}
 }
 
 git checkout $end_tag #Detach the repo to the state of the ending tag.
 
 foreach($file in $diff_hash.keys){
-    write-Host $file
+    write-Host $file -ForegroundColor Cyan
     if(Test-Path $file){ $diff_hash[$file].End = $true}
 }
 
@@ -102,7 +137,7 @@ foreach($file in $diff_hash.keys){
 git checkout main
 
 Write-Host
-Write-Host "Show Diff Files ..."
+Write-Host "Show Diff Files ..." -ForegroundColor Cyan
 $diff_files
 Write-Host
 
@@ -113,7 +148,7 @@ git checkout $dbops_main
 Get-ChildItem | 
     Where-Object { $_.Name.ToUpper() -notin '.GITHUB', '.GIT' } |
     ForEach-Object {
-        Write-Host $("Removing: " + $_.FullName)
+        Write-Host $("Removing: " + $_.FullName) -ForegroundColor Cyan
         Remove-Item -Path $_.FullName -Recurse -Force
     }    
 
@@ -169,11 +204,11 @@ foreach($filekey in $diff_hash.Keys)
             Copy-Item -LiteralPath $($oldpath+$oldfile) -Destination $($newpath+$newitem) -Force | Out-Null      
 
         } else {
-            Write-Host ("Not starting file:  " + $filekey)
+            Write-Host ("Not starting file:  " + $filekey) -ForegroundColor Cyan
         }
 
     } else {
-        Write-Host ( "File Excluded:  " + $filekey )
+        Write-Host ( "File Excluded:  " + $filekey ) -ForegroundColor Cyan
     }
 }
 
@@ -211,7 +246,7 @@ foreach($filekey in $diff_hash.Keys)
 
         #$path = $(Split-Path $olditem  -Parent).replace($path_cdw,$path_dbops)
 
-        Write-Host $( "Working Item:  " + $oldfile )
+        Write-Host $( "Working Item:  " + $oldfile ) -ForegroundColor Cyan
 
         #write-host "Set-location $oldpath"
         Set-Location $oldpath
@@ -226,7 +261,7 @@ foreach($filekey in $diff_hash.Keys)
         Copy-Item -LiteralPath $($oldpath+$oldfile) -Destination $($newpath+$newitem) -Force | Out-Null   
 
     } else {
-        Write-Host ( "File Excluded:  " + $filekey )
+        Write-Host ( "File Excluded:  " + $filekey ) -ForegroundColor Cyan
     }
 }
 
@@ -260,3 +295,31 @@ if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_content) ) ){
 }
 
 #endregion
+
+#region  ~~  GITHUB  ~~
+
+#Must Authenticate GitHub CLI first.
+
+#Create Pull Request.
+
+#gh auth login --hostname github
+# --base branchB --> Target branch( branch I want to merge into)
+# --head branchA --> source branch(the branch you want to merge from)
+# --title and --body are optional ... but useful.
+
+#gh pr create --base branchB --head branchA --title "My PR Title" --body "Details here"
+
+Set-Location $path_dbops 
+
+#Check if a pull request has already been created. If not, create it.
+$ExistingPR = @( gh pr list )
+
+if( -not($ExistingPR.Contains($dbops_release_branch))){
+    Write-Host "Creating Pull Request [$dbops_release_branch]" -ForegroundColor Cyan
+    gh pr create --base $dbops_release_branch --head $dbops_release_content --title "$dbops_release_branch" --body "Diff for $start_tag to $end_tag"
+} else {
+    Write-Host "Open Pull Request already exists." -ForegroundColor Cyan
+}
+
+
+#endregion 
