@@ -25,6 +25,7 @@
 #   2. Input the starting and ending release tag. ( $start_tag , $end_tag)
 #   3. Input the path to the vcrs-cdw-db and vcrs-cdw-dbops git folders.
 #   4. Verify the default branch are correct in $cdw_main and $dbops_main. They should be 'main'
+#   5. Optional. filter by file extension.
 
 Clear-Host
 
@@ -36,7 +37,11 @@ Clear-Host
 $start_tag = 'release_25.4.0'
 $end_tag   = 'release_24.4.7'
 
-#Git variables
+#extension filter. semi-colon delimited, include dot (.)
+#  only include files with the extension.
+#  empty ("") means no filter applied.
+$filterStr = ".sql;.ps1"
+#$filterStr = ""
 
 $path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
 $path_dbops = 'C:\Git\CDW\vcrs-cdw-dbops' 
@@ -102,8 +107,54 @@ function Check-BranchExists {
     return $BranchExists
 }
 
+function Clear-GitFolder {
+
+#SAFETY. Make sure function always focus on dbops root before clearing.    
+Set-Location $path_dbops
+
+Get-ChildItem | 
+    Where-Object { $_.Name.ToUpper() -notin '.GITHUB', '.GIT' } |
+    ForEach-Object {
+        Write-Host $("Removing: " + $_.FullName) -ForegroundColor Cyan
+        Remove-Item -Path $_.FullName -Recurse -Force
+    }    
+
+git add .
+git commit -m "Cleared git folder"
+
+}
+
 #endregion
 
+
+#region  ~~  SETUP DBOPS REPO  ~~
+
+#If the script has already been run once. Need to clear things.
+#  Make sure the branch exists.
+set-location $path_dbops
+
+git checkout $dbops_main
+
+#If branch doesn't exists, create it.
+if( Check-BranchExists $dbops_release_branch  ){
+    git checkout $dbops_release_branch
+    Clear-GitFolder
+} else {
+    git branch $dbops_release_branch
+}
+
+git checkout $dbops_main
+
+if( Check-BranchExists $dbops_release_content  ){
+    git checkout $dbops_release_content
+    Clear-GitFolder
+} else {
+    git branch $dbops_release_content
+}
+
+git checkout $dbops_main
+
+#endregion
 
 #region  ~~  DIFF  ~~
 
@@ -123,16 +174,38 @@ $head_sha = (git rev-parse HEAD)
 
 $diff_files = (git diff --name-only $start_tag $end_tag | ForEach-Object { (Resolve-Path $_).Path})
 
-#$diff_files = (git diff $start_tag $end_tag --name-only)
+# $diff_files = (git diff $start_tag $end_tag --name-only)
+#   We need to identify if the file exists during the starting tag and the ending tag.
+#   If not at the starting tag but at the ending tag. NEW FILE
+#   If at the starting but not at the ending tag. DELETED FILE. Exclude.
 
-# We need to identify if the file exists during the starting tag and the ending tag.
-# If not at the starting tag but at the ending tag. NEW FILE
-# If at the starting but not at the ending tag. DELETED FILE. Exclude.
-
+#Filter wanted files. Any file with an extension type not in the list is excluded.
 $diff_hash = @{}
-foreach( $File in $diff_files )
-{
-    $diff_hash.add($file,@{'Start' = $false;'End' = $false})
+
+if($filterstr -ne ''){
+    $filterlist = @( $filterStr -split ';').ToUpper()
+
+    $diff_files | get-item | foreach-object {
+
+        $file = $_
+
+        if($file.extension.ToUpper() -in $filterlist)
+        {
+            #Write-Host ( "Include File:  " + $file.FullName )
+            $diff_hash.add(($file.FullName).ToString() ,@{'Start' = $false;'End' = $false})
+        } else {
+            Write-Host ( "Exclude File:  " + $file.FullName ) -ForegroundColor Cyan
+        }
+    }
+} else {
+
+    Write-Host "No Filter Applied." -ForegroundColor Cyan
+    #Filter not used.
+    foreach( $file in $diff_files )
+    {
+        $diff_hash.add($file,@{'Start' = $false;'End' = $false})
+    }
+   
 }
 
 git checkout $start_tag #Detach the repo to the state of starting tag.
@@ -161,15 +234,17 @@ Set-Location $path_dbops
 
 git checkout $dbops_main
 
-Get-ChildItem | 
-    Where-Object { $_.Name.ToUpper() -notin '.GITHUB', '.GIT' } |
-    ForEach-Object {
-        Write-Host $("Removing: " + $_.FullName) -ForegroundColor Cyan
-        Remove-Item -Path $_.FullName -Recurse -Force
-    }    
+clear-gitfolder
 
-git add .
-git commit -m "Cleared dbops folder"
+#Get-ChildItem | 
+#    Where-Object { $_.Name.ToUpper() -notin '.GITHUB', '.GIT' } |
+#    ForEach-Object {
+#        Write-Host $("Removing: " + $_.FullName) -ForegroundColor Cyan
+#        Remove-Item -Path $_.FullName -Recurse -Force
+#    }    
+#
+#git add .
+#git commit -m "Cleared dbops folder"
 
 #If branch doesn't exists, create it.
 if( -not ( Check-BranchExists $dbops_release_branch ) ){
@@ -177,6 +252,8 @@ if( -not ( Check-BranchExists $dbops_release_branch ) ){
 }
 
 git checkout $dbops_release_branch
+
+Clear-GitFolder
 
 Set-Location $path_cdw
 
@@ -311,6 +388,7 @@ if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_content) ) ){
 }
 
 #endregion
+
 
 #region  ~~  GITHUB  ~~
 
