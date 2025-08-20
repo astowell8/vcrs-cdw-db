@@ -1,20 +1,27 @@
 #region  ~~  ABOUT  ~~
-#Test
-#  1. Between two tags
-#  2. Make sure files that were added later aren't include.
-
-# BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
-#   There Can't be any in-progress work.
-
-# PREREQUISITE
-#   1. git clone vcrs-cdw-db
-#   2. git clone vcrc-cdw-dbops
-#   3. GitHub CLI
-#        gh auth login --hostname github.com --git-protocol https --web
-#        Registers Your device with GitHub. Shouldn't need to do this multiple times.
-
+#
+# DEV: Andy Stowell
+# DATE: 2025/08/19
+#
+# PURPOSE:
+#   This script will read the local git vcrs-cdw-db repo for changes between two specified release  
+#   tags. Then pushes a copy of the added or modified files to the vcrs-cdw-dbops repo for review.
+#   A Pull Request is then created showing the changes to those files.
+#
+#   FYI
+#     (!) BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
+#     (!) BEFORE THIS CAN BE RUN, ALL WORK MUST BE COMMITED OR STASHED.
+#
+# PREREQUISITE:
+#   1. A local git clone of vcrs-cdw-db
+#   2. A local git clone of vcrc-cdw-dbops
+#   3. Need GitHub CLI installed.
+#     Will need to register device with get.
+#     run in powershell:   gh auth login --hostname github.com --git-protocol https --web
+#     a 8 character code will be returned. 
+#
 # HOW TO USE:
-#   1. Go to the USER INPUT Region
+#   1. Go to the USER INPUT Region.
 #   2. Input the starting and ending release tag. ( $start_tag , $end_tag)
 #   3. Input the path to the vcrs-cdw-db and vcrs-cdw-dbops git folders.
 #   4. Verify the default branch are correct in $cdw_main and $dbops_main. They should be 'main'
