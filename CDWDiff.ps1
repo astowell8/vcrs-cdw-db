@@ -1,22 +1,30 @@
-
+#region  ~~  ABOUT  ~~
 #Test
 #  1. Between two tags
 #  2. Make sure files that were added later aren't include.
 
 # BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
-# THERE Can't be any inprogress work.
+#   There Can't be any in-progress work.
 
-#PREREQUISITE
-#  GitHub CLI
-#    gh auth login --hostname github.com --git-protocol https --web
-#    Registers Your device with GitHub. Shouldn't need to do this multiple times.
+# PREREQUISITE
+#   1. git clone vcrs-cdw-db
+#   2. git clone vcrc-cdw-dbops
+#   3. GitHub CLI
+#        gh auth login --hostname github.com --git-protocol https --web
+#        Registers Your device with GitHub. Shouldn't need to do this multiple times.
+
+# HOW TO USE:
+#   1. Go to the USER INPUT Region
+#   2. Input the starting and ending release tag. ( $start_tag , $end_tag)
+#   3. Input the path to the vcrs-cdw-db and vcrs-cdw-dbops git folders.
+#   4. Verify the default branch are correct in $cdw_main and $dbops_main. They should be 'main'
 
 Clear-Host
 
-#region  ~~  INPUT  ~~
+#endregion
 
-#$start_tag = 'Release_1.0.1'
-#$end_tag   = 'Release_1.0.6'
+#region  ~~  USER INPUT  ~~
+
 
 $start_tag = 'release_25.4.0'
 $end_tag   = 'release_24.4.7'
@@ -26,11 +34,11 @@ $end_tag   = 'release_24.4.7'
 $path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
 $path_dbops = 'C:\Git\CDW\vcrs-cdw-dbops' 
 
-#$path_cdw   = 'C:\Git\MockRepo\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
-#$path_dbops = 'C:\Git\MockRepo\vcrs-cdw-dbops' 
 
 $cdw_main = 'main'
 $dbops_main = 'main'
+
+
 $dbops_release_branch = $( 'Release_' + $start_tag.ToUpper().replace('RELEASE_','') + '_to_' + $end_tag.ToUpper().Replace('RELEASE_','') ) #handle case-sensitive.
 $dbops_release_content = 'ReleaseContent' # Holds the new/modified files. 
 
@@ -107,6 +115,7 @@ git pull
 $head_sha = (git rev-parse HEAD)
 
 $diff_files = (git diff --name-only $start_tag $end_tag | ForEach-Object { (Resolve-Path $_).Path})
+
 #$diff_files = (git diff $start_tag $end_tag --name-only)
 
 # We need to identify if the file exists during the starting tag and the ending tag.
@@ -318,7 +327,7 @@ if( -not($ExistingPR.Contains($dbops_release_branch))){
     Write-Host "Creating Pull Request [$dbops_release_branch]" -ForegroundColor Cyan
     gh pr create --base $dbops_release_branch --head $dbops_release_content --title "$dbops_release_branch" --body "Diff for $start_tag to $end_tag"
 } else {
-    Write-Host "Open Pull Request already exists." -ForegroundColor Cyan
+    Write-Host "Pull Request already exists." -ForegroundColor Cyan
 }
 
 
