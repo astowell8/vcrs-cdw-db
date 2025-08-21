@@ -135,6 +135,10 @@ set-location $path_dbops
 
 git checkout $dbops_main
 
+
+Write-Host "Setting up release branches" -ForegroundColor Cyan
+
+
 #If branch doesn't exists, create it.
 if( Check-BranchExists $dbops_release_branch  ){
     git checkout $dbops_release_branch
@@ -151,6 +155,26 @@ if( Check-BranchExists $dbops_release_content  ){
 } else {
     git branch $dbops_release_content
 }
+
+
+<#
+
+if( Check-BranchExists $dbops_release_content  ){
+    git branch -D $dbops_release_content
+}
+
+if( Check-BranchExists $dbops_release_branch  ){
+    git branch -D $dbops_release_branch
+} 
+
+git branch $dbops_release_branch
+
+git checkout $dbops_release_branch
+
+git branch $dbops_release_content
+
+#>
+
 
 git checkout $dbops_main
 
