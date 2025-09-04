@@ -35,7 +35,7 @@
 #   The contents of vcrs-cdw-dbops is then pushed to github. A Pull Request is then generated.
 #   
 # HISTORY:
-#   2025-08-19 Andy Stowell  *UL-2125. Created Script.
+#   2025-08-19  Andy Stowell  *UL-2125. Created Script.
 #
 
 Clear-Host
