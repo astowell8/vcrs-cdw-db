@@ -4,35 +4,45 @@
 # DATE: 2025/08/19
 #
 # PURPOSE:
-#   This script will read the local git vcrs-cdw-db repo for changes between two specified release  
-#   tags. Then pushes a copy of the added or modified files to the vcrs-cdw-dbops repo for review.
-#   A Pull Request is then created showing the changes to those files.
+#   This script will read a local instnace of the git vcrs-cdw-db repo. It looks for changes between 
+#   two specified release tags. It Then pushes a copy of the added or modified files to the 
+#   vcrs-cdw-dbops repo for review. A Pull Request is then created showing the changes to those files.
 #
-#   FYI
-#     (!) BEFORE THIS CAN BE RUN, THE GIT REPO MUST BE AT MAIN.
-#     (!) BEFORE THIS CAN BE RUN, ALL WORK MUST BE COMMITED OR STASHED.
 #
 # PREREQUISITE:
-#   1. A local git clone of vcrs-cdw-db
-#   2. A local git clone of vcrc-cdw-dbops
+#   1. A local git clone of [vcrs-cdw-db]
+#   2. A local git clone of [vcrs-cdw-dbops]
 #   3. Need GitHub CLI installed.
 #     Will need to register device with get.
 #     run in powershell:   gh auth login --hostname github.com --git-protocol https --web
 #     a 8 character code will be returned. 
 #
 # HOW TO USE:
-#   1. Go to the USER INPUT Region.
+#
+#   FYI
+#     (!) BEFORE THIS CAN BE RUN, 
+#           a. THE GIT REPO MUST BE SET THE MAIN BRANCH.
+#           b. ALL WORK MUST BE COMMITED OR STASHED.
+#
+#   1. Go to the USER INPUT region (just below) of this script.
 #   2. Input the starting and ending release tag. ( $start_tag , $end_tag)
 #   3. Input the path to the vcrs-cdw-db and vcrs-cdw-dbops git folders.
 #   4. Verify the default branch are correct in $cdw_main and $dbops_main. They should be 'main'
-#   5. Optional. filter by file extension.
+#   5. OPTIONAL. Add a whitelist filter by file extension( i.g. .sql; .ps1; .txt). 
+#
+#   (!) When running. The script will populate a local copy of the git repo vcrs-cdw-dbops with 
+#   the files that have changed between release. files deleted between releases are excluded.
+#   The contents of vcrs-cdw-dbops is then pushed to github. A Pull Request is then generated.
+#   
+# HISTORY:
+#   2025-08-19 Andy Stowell  *UL-2125. Created Script.
+#
 
 Clear-Host
 
 #endregion
 
 #region  ~~  USER INPUT  ~~
-
 
 $start_tag = 'release_24.4.7'
 $end_tag   = 'release_25.4.0'
@@ -41,7 +51,7 @@ $end_tag   = 'release_25.4.0'
 #  only include files with the extension.
 #  empty ("") means no filter applied.
 
-$filterStr = ".sql;.ps1"  #Whitelist filter, semi-colon delimited.
+#$filterStr = ".sql;.ps1"  #Whitelist filter, semi-colon delimited.
 $filterStr = ""
 
 $path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
