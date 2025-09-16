@@ -190,7 +190,7 @@ function Build-GitDiffHash{
 
     $Diff_FileHash = @{}
 
-    foreach($file in $FileList.ToString(){
+    foreach($file in $FileList){
         #Must cast $file as string or lookup in hash will fail.
         $Diff_FileHash.add( $([string] $file), @{'Start' = $false; 'End' = $false} )
     }
