@@ -408,7 +408,7 @@ if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_branch) ) ){
 }
 
 
-#region  ~~  GITHUB  ~~
+#region  ~~  GITHUB PULL REQUEST  ~~
 
 #Must Authenticate GitHub CLI first.
 
@@ -428,7 +428,7 @@ $ExistingPR = @( gh pr list )
 
 if( -not($ExistingPR.Contains($dbops_release_branch))){
     Write-Host "CREATING PULL REQUEST [$dbops_release_branch]" -ForegroundColor Cyan
-    gh pr create --base $dbops_main --head $dbops_release_branch --title "Release Changes - $dbops_release_branch" --body "PR contains changes from $start_tag to $end_tag"
+    gh pr create --base $dbops_main --head $dbops_release_branch --title "Release Delta - $dbops_release_branch" --body "PR contains changes from $start_tag to $end_tag"
 } else {
     Write-Host "Pull Request already exists." -ForegroundColor Cyan
 }

@@ -1,28 +1,35 @@
 #region  ~~  ABOUT  ~~
 #
 # DEV: Andy Stowell
-# DATE: 2025/08/19
+# DATE: 2025/09/18
+# RELATED SCRIPT:  "Create-CDW-Release-Differential-v2-Part2.ps1"
 #
-# PURPOSE:
-#   This script will read a local instnace of the git vcrs-cdw-db repo. It looks for changes between 
-#   two specified release tags. It Then pushes a copy of the added or modified files to the 
-#   vcrs-cdw-dbops repo for review. A Pull Request is then created showing the changes to those files.
+# ABOUT:
+#   >>>  THIS SCRIPT IS PART 1 of 2 of the Release Differential scripts  <<<
+#
+#   * This script will read a local instance of the git vcrs-cdw-db repo. 
+#   * It finds all files that have changed/added between two specific releases.
+#   * A branch and folder "Release_<base release>-<new release>" is created and 
+#       filled with the files from the start release. 
+#   * The branch is pushed to git up and a PR is made to merge to [main].
 #
 #
 # PREREQUISITE:
 #   1. A local git clone of [vcrs-cdw-db]
 #   2. A local git clone of [vcrs-cdw-dbops]
 #   3. Need GitHub CLI installed.
-#     Will need to register device with get.
-#     run in powershell:   gh auth login --hostname github.com --git-protocol https --web
-#     a 8 character code will be returned. 
+#     * TO SETUP GITHUB CLI
+#         > Will need to register device with github.
+#         > run command  in powershell :      gh auth login --hostname github.com --git-protocol https --web
+#         > a 8 character code will be returned, enter it in the web login.
+#
 #
 # HOW TO USE:
 #
 #   FYI
 #     (!) BEFORE THIS CAN BE RUN, 
 #           a. THE GIT REPO MUST BE SET THE MAIN BRANCH.
-#           b. ALL WORK MUST BE COMMITED OR STASHED.
+#           b. >>>  (IMPORTANT) ALL WORK MUST BE COMMITED OR STASHED.  <<<
 #
 #   1. Go to the USER INPUT region (just below) of this script.
 #   2. Input the starting and ending release tag. ( $start_tag , $end_tag)
@@ -36,6 +43,9 @@
 #   
 # HISTORY:
 #   2025-08-19  Andy Stowell  *UL-2125. Created Script.
+#   2025-09-18  Andy Stowell  *UL-2125. Re-engineered script so vcrs-cdw-dbops repo does not get 
+#                                cleared. Instead deltas are now stored in their own folder in the
+#                                main branch. Original script is now split into two ps1 scripts.
 #
 
 Clear-Host
@@ -44,8 +54,12 @@ Clear-Host
 
 #region  ~~  USER INPUT  ~~
 
-$start_tag = 'release_24.4.4'
-$end_tag   = 'release_24.4.5'
+$start_tag  = 'release_24.4.4'
+$end_tag    = 'release_24.4.5'
+$path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
+$path_dbops = 'C:\Git\CDW\vcrs-cdw-dbops' 
+$cdw_main   = 'main'
+$dbops_main = 'main'
 
 #Whitelist extension filter. semi-colon delimited, include dot (.)
 #  only include files with the extension.
@@ -54,30 +68,46 @@ $end_tag   = 'release_24.4.5'
 #$filterStr = ".sql;.ps1"  #Whitelist filter, semi-colon delimited.
 $filterStr = ""
 
-$path_cdw   = 'C:\Git\CDW\vcrs-cdw-db' # Path to git vcrs-cdw-db folder.
-$path_dbops = 'C:\Git\CDW\vcrs-cdw-dbops' 
+#endregion
 
-
-$cdw_main = 'main'
-$dbops_main = 'main'
-
-#$dbops_release_content = $('Release_'+$end_tag.ToUpper().Replace('RELEASE_','')) # Holds the new/modified files. 
+#region  ~~  SCRIPT VARIABLES / DATASTRUCTURES  ~~
 
 $dbops_release_folder = "Release_" + $start_tag.ToUpper().replace('RELEASE_','') + "-" + $end_tag.ToUpper().replace('RELEASE_','') + ""
 $dbops_release_branch = $( 'StartContent_from_' + $start_tag.ToUpper().replace('RELEASE_','') + '_to_' + $end_tag.ToUpper().Replace('RELEASE_','') ) #handle case-sensitive.
 
+# This data table contains the list of all the delta files.
+# Files that are deleted between start and end release are excluded.
+# Note - DataTable was choosen over a Hash Table because git sometimes returns 
+#   file in a different encoding. This causes the Key/Value lookup to fail.
+#   This issue doesn't seem to happen with data tables.
 $DT_Diff = New-Object System.Data.DataTable
 [Void] $DT_Diff.Columns.Add('File',[String])
 [Void] $DT_Diff.Columns.Add('Start',[bool])
 [Void] $DT_Diff.Columns.Add('End',[bool])
 
-$Head_Sha = ''
-
+$Head_Sha = '' #Future Use?
 
 #endregion
 
 
 #region  ~~  CHECK  ~~
+
+#Verify Start/End Release Tags.
+
+Set-location $path_cdw
+$TagList = @(git tag --list)
+
+if( $TagList -contains $start_tag )
+{
+    Write-Host "Start Tag [$start_tag] is not valid." -ForegroundColor Red
+    exit
+}
+
+if( $TagList -contains $end_tag )
+{
+    Write-Host "Start Tag [$end_tag] is not valid." -ForegroundColor Red
+    exit
+}
 
 if( -not (test-path ($path_cdw + '\.git')))
 {
@@ -106,7 +136,7 @@ if(Get-Command gh -ErrorAction SilentlyContinue)
 #endregion
 
 
-#region  ~~  FUNCTION  ~~
+#region  ~~  FUNCTIONS  ~~
 
 function Check-BranchExists {
     param(
@@ -156,16 +186,7 @@ function Build-GitFileList{
     $FileList = @()
     $Filtered_FileList = @()
 
-    #$FileList = (git diff --name-only $StartTag $EndTag | ForEach-Object { (Resolve-Path $_).Path})
-    #$FileList = (git diff --name-only $StartTag $EndTag | ForEach-Object { (Resolve-Path $_).Path})
-
     $FileList = (git diff --name-only $StartTag $EndTag | ForEach-Object { [String](Resolve-Path $_).Path})
-
-    # foreach( $F in (git diff --name-only $StartTag $EndTag | ForEach-Object { [String](Resolve-Path $_).Path}))
-    # {
-    #     $FileList  += [String] $F.ToString()
-    # }
-
 
     # Filter out files without a matching extension in the filterlist.    
     if($FilterString -ne ''){
@@ -189,56 +210,6 @@ function Build-GitFileList{
     }  
 }
 
-function Build-GitDiffHash{
-    param(
-         [String[]] $FileList
-        ,[String]   $StartTag
-        ,[String]   $EndTag
-        ,[String]   $MainBranch
-    )
-
-    if( $null -ne $Diff_FileHash){
-        Remove-Variable Diff_FileHash
-    }
-
-    $Diff_FileHash = @{}
-
-    foreach($file in $FileList){
-        #Must cast $file as string or lookup in hash will fail.
-        $FileNameString = [String]  $file.ToString()
-        $Diff_FileHash.add(  $FileNameString , @{'Start' = $false; 'End' = $false} )
-
-        #TEST - DATATABLE
-        $NR = $DT_Diff.NewRow()
-        $NR["File"] = $file
-        $NR["Start"] = $false
-        $NR["End"] = $false
-
-        $DT_Diff.Rows.Add($NR)
-    }
-
-    git checkout $StartTag #Detach the repo to the state of starting tag.
-
-    foreach($file in $Diff_FileHash.keys){
-        if(Test-Path $file){ 
-            $Diff_FileHash[$file].Start = $true
-        }
-    }
-
-    git checkout $EndTag #Detach the repo to the state of the ending tag.
-
-    foreach($file in $Diff_FileHash.keys){
-        if(Test-Path $file){
-            $Diff_FileHash[$file].End = $true
-        }
-    }
-
-    #reattach back to HEAD
-    git checkout $MainBranch
-    
-    return $Diff_FileHash
-}
-
 # DataTables pass by  reference.
 function Build-GitDiffDT{
     param(
@@ -247,8 +218,6 @@ function Build-GitDiffDT{
         ,[String]   $EndTag
         ,[String]   $MainBranch
     )
-
-
 
     #Iterate through the list of files found by git diff.
     #  detach the repo to the state of the starting and ending flag.
@@ -328,17 +297,8 @@ git checkout $start_tag
 
 $DT_Diff | Out-GridView
 
-# Read-Host "Stop Here"
-# Exit
-
 foreach($DiffRow in $DT_Diff)
 {
-
-    #Write-Host "HASH KEY"
-    #WRite-Host $filekey
-
-    #Write-Host "BOOL"
-    #Write-Host $diff_hash[$filekey].Start
 
     # Tracks if a file existed during the time of the starttag and endtag.
     #   Used for determining  if a file is new or deleted between the tag range.
@@ -407,7 +367,7 @@ if( -not ( Check-BranchExists $('remotes/origin/'+$dbops_release_branch) ) ){
 #endregion
 
 
-#region  ~~  GITHUB  ~~
+#region  ~~  GITHUB PULL REQUEST ~~
 
 #Must Authenticate GitHub CLI first.
 
@@ -427,7 +387,7 @@ $ExistingPR = @( gh pr list )
 
 if( -not($ExistingPR.Contains($dbops_release_branch))){
     Write-Host "CREATING PULL REQUEST [$dbops_release_branch]" -ForegroundColor Cyan
-    gh pr create --base $dbops_main --head $dbops_release_branch --title "Base Release Files - $dbops_release_branch" --body "Establish base release [$start_tag] files in release folder."
+    gh pr create --base $dbops_main --head $dbops_release_branch --title "Base Files - $dbops_release_branch" --body "Establish base release [$start_tag] files in release folder."
 } else {
     Write-Host "Pull Request already exists." -ForegroundColor Cyan
 }
